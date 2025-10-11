@@ -13,7 +13,7 @@ interface DoctorCardProps {
 
 export const DoctorCard = ({ doctor, onUpdateStatus, onCallNext }: DoctorCardProps) => {
   const { tokens } = useClinic();
-  const currentToken = tokens.find(t => t.id === doctor.currentToken);
+  const currentToken = tokens.find(t => t.tokenNumber === doctor.currentToken);
 
   const getBreakTimeRemaining = () => {
     if (!doctor.breakEndTime) return null;
