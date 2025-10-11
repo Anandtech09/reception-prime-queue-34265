@@ -119,46 +119,44 @@ export default function Display() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 p-6">
-      {/* Header with Date/Time */}
-      <div className="flex items-center justify-between mb-6 px-2">
-        <div className="flex items-center gap-8">
-          <div className="text-2xl font-semibold text-primary">
-            {currentTime.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </div>
-          <div className="text-4xl font-bold font-mono text-foreground">
-            {currentTime.toLocaleTimeString('en-US', { 
-              hour: '2-digit', 
-              minute: '2-digit',
-              second: '2-digit'
-            })}
-          </div>
-        </div>
-        
-        {/* Waiting Stats */}
-        <div className="flex items-center gap-4">
-          <Card className="px-6 py-3 bg-card/90 backdrop-blur">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-foreground">{queueStats.gpWaiting}</div>
-              <div className="text-sm text-muted-foreground">GP Waiting</div>
+      {/* Compact Header */}
+      <div className="bg-card/80 backdrop-blur rounded-lg px-6 py-3 mb-6 shadow-sm">
+        <div className="flex items-center justify-between">
+          {/* Date and Time */}
+          <div className="flex items-center gap-6">
+            <div className="text-lg text-muted-foreground">
+              {currentTime.toLocaleDateString('en-US', { 
+                weekday: 'short', 
+                month: 'short', 
+                day: 'numeric',
+                year: 'numeric'
+              })}
             </div>
-          </Card>
-          <Card className="px-6 py-3 bg-card/90 backdrop-blur">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-foreground">{queueStats.dentalWaiting}</div>
-              <div className="text-sm text-muted-foreground">Dental Waiting</div>
+            <div className="text-2xl font-mono font-bold text-foreground">
+              {currentTime.toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit'
+              })}
             </div>
-          </Card>
-          <Card className="px-6 py-3 bg-accent/20 backdrop-blur border-accent">
+          </div>
+          
+          {/* Waiting Stats - Inline */}
+          <div className="flex items-center gap-8">
             <div className="text-center">
+              <div className="text-xs text-muted-foreground mb-1">GP Queue</div>
+              <div className="text-2xl font-bold text-primary">{queueStats.gpWaiting}</div>
+            </div>
+            <div className="h-8 w-px bg-border"></div>
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground mb-1">Dental Queue</div>
+              <div className="text-2xl font-bold text-primary">{queueStats.dentalWaiting}</div>
+            </div>
+            <div className="h-8 w-px bg-border"></div>
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground mb-1">Total Waiting</div>
               <div className="text-3xl font-bold text-accent">{queueStats.totalWaiting}</div>
-              <div className="text-sm text-muted-foreground font-semibold">Total</div>
             </div>
-          </Card>
+          </div>
         </div>
       </div>
 
