@@ -13,7 +13,7 @@ export const TokenGenerationForm = () => {
   const [patientName, setPatientName] = useState('');
   const [patientId, setPatientId] = useState('');
   const [serviceType, setServiceType] = useState<ServiceType>('GP');
-  const [specificDoctor, setSpecificDoctor] = useState<string>('');
+  const [specificDoctor, setSpecificDoctor] = useState<string>('none');
 
   const availableDoctors = doctors.filter(d => d.serviceType === serviceType && d.status === 'active');
 
@@ -21,12 +21,17 @@ export const TokenGenerationForm = () => {
     e.preventDefault();
     if (!patientName || !patientId) return;
 
-    generateToken(patientName, patientId, serviceType, specificDoctor || undefined);
+    generateToken(
+      patientName, 
+      patientId, 
+      serviceType, 
+      specificDoctor && specificDoctor !== 'none' ? specificDoctor : undefined
+    );
     
     // Reset form
     setPatientName('');
     setPatientId('');
-    setSpecificDoctor('');
+    setSpecificDoctor('none');
   };
 
   return (
@@ -82,7 +87,7 @@ export const TokenGenerationForm = () => {
                 <SelectValue placeholder="Any available doctor" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Any available doctor</SelectItem>
+                <SelectItem value="none">Any available doctor</SelectItem>
                 {availableDoctors.map(doc => (
                   <SelectItem key={doc.id} value={doc.id}>
                     {doc.name} - Cabin {doc.cabinNumber}
