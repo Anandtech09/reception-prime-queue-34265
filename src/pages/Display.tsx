@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useClinic } from '@/contexts/ClinicContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,23 +6,37 @@ import { Badge } from '@/components/ui/badge';
 export default function Display() {
   const { doctors, tokens, queueStats } = useClinic();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const previousCallingTokens = useRef<string[]>([]);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
+  // Play sound when new patient is called
+  useEffect(() => {
+    const currentCallingTokens = tokens
+      .filter(t => t.status === 'calling')
+      .map(t => t.id);
+
+    const newCallingTokens = currentCallingTokens.filter(
+      id => !previousCallingTokens.current.includes(id)
+    );
+
+    if (newCallingTokens.length > 0) {
+      // Play alert sound
+      if (!audioRef.current) {
+        audioRef.current = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGH0fPTgjMGHm7A7+OZSA0PVqzn77BdGAg+mdryz3guBSh+zPLaizsIGGS57OihUBELTKXh8bllHAU2jdXzzn0pBSd/z/LZijYIGmW67Od9Lg==');
+      }
+      audioRef.current.play().catch(e => console.log('Audio play failed:', e));
+    }
+
+    previousCallingTokens.current = currentCallingTokens;
+  }, [tokens]);
+
   const gpDoctors = doctors.filter(d => d.serviceType === 'GP');
   const dentalDoctors = doctors.filter(d => d.serviceType === 'DENTAL');
-
-  const getNextToken = (doctorId: string, serviceType: string) => {
-    const waitingTokens = tokens.filter(t => 
-      t.status === 'waiting' && 
-      t.serviceType === serviceType &&
-      (!t.assignedDoctorId || t.assignedDoctorId === doctorId)
-    );
-    return waitingTokens[0]?.tokenNumber || '-';
-  };
 
   const getCurrentToken = (doctor: any) => {
     const callingToken = tokens.find(t => 
@@ -38,6 +52,13 @@ export default function Display() {
     return remaining > 0 ? `Back in ${remaining} min` : null;
   };
 
+  const getDoctorQueueCount = (doctorId: string) => {
+    return tokens.filter(t => 
+      t.assignedDoctorId === doctorId && 
+      t.status === 'waiting'
+    ).length;
+  };
+
   const DoctorTable = ({ doctors, title }: { doctors: any[], title: string }) => (
     <div className="mb-8">
       <h2 className="text-4xl font-bold text-primary mb-4 px-2">{title}</h2>
@@ -48,14 +69,14 @@ export default function Display() {
               <th className="px-6 py-4 text-left text-xl font-bold">Doctor</th>
               <th className="px-6 py-4 text-left text-xl font-bold">Cabin</th>
               <th className="px-6 py-4 text-left text-xl font-bold">Status</th>
-              <th className="px-6 py-4 text-left text-xl font-bold">Now Calling</th>
-              <th className="px-6 py-4 text-left text-xl font-bold">Next</th>
+              <th className="px-6 py-4 text-center text-xl font-bold">Now Calling</th>
+              <th className="px-6 py-4 text-center text-xl font-bold">In Queue</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {doctors.map((doctor) => {
               const currentToken = getCurrentToken(doctor);
-              const nextToken = getNextToken(doctor.id, doctor.serviceType);
+              const queueCount = getDoctorQueueCount(doctor.id);
               const breakTime = getBreakTimeRemaining(doctor);
 
               return (
@@ -88,9 +109,9 @@ export default function Display() {
                       </Badge>
                     )}
                   </td>
-                  <td className="px-6 py-5">
+                  <td className="px-6 py-5 text-center">
                     {doctor.status === 'active' ? (
-                      <span className={`text-4xl font-mono font-bold ${
+                      <span className={`text-5xl font-mono font-bold ${
                         currentToken !== '-' ? 'text-status-calling animate-pulse' : 'text-muted-foreground'
                       }`}>
                         {currentToken}
@@ -99,14 +120,10 @@ export default function Display() {
                       <span className="text-2xl text-muted-foreground">-</span>
                     )}
                   </td>
-                  <td className="px-6 py-5">
-                    {doctor.status === 'active' ? (
-                      <span className="text-2xl font-mono font-semibold text-muted-foreground">
-                        {nextToken}
-                      </span>
-                    ) : (
-                      <span className="text-xl text-muted-foreground">-</span>
-                    )}
+                  <td className="px-6 py-5 text-center">
+                    <span className="text-3xl font-bold text-primary">
+                      {queueCount}
+                    </span>
                   </td>
                 </tr>
               );

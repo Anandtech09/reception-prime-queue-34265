@@ -21,9 +21,23 @@ export const QueueTable = () => {
       return <Badge className="bg-status-calling text-white">Calling</Badge>;
     }
     if (token.isSpecificDoctor && token.assignedDoctorId) {
-      return <Badge variant="outline" className="border-accent text-accent">Dedicated</Badge>;
+      return <Badge variant="outline" className="border-accent text-accent">Specific Request</Badge>;
     }
     return <Badge variant="secondary">Waiting</Badge>;
+  };
+
+  const getDoctorQueuePosition = (token: Token) => {
+    if (!token.assignedDoctorId) return '-';
+    
+    const doctorTokens = tokens
+      .filter(t => 
+        t.assignedDoctorId === token.assignedDoctorId && 
+        t.status === 'waiting'
+      )
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    
+    const position = doctorTokens.findIndex(t => t.id === token.id);
+    return position >= 0 ? `#${position + 1}` : '-';
   };
 
   return (
@@ -39,18 +53,19 @@ export const QueueTable = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Token</TableHead>
-                <TableHead>Patient</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Assigned To</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+            <TableHead>Token</TableHead>
+            <TableHead>Patient</TableHead>
+            <TableHead>Service</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Assigned Doctor</TableHead>
+            <TableHead>Queue Position</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {activeTokens.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
                     No patients in queue
                   </TableCell>
                 </TableRow>
@@ -65,6 +80,7 @@ export const QueueTable = () => {
                     <TableCell>{token.serviceType}</TableCell>
                     <TableCell>{getStatusBadge(token)}</TableCell>
                     <TableCell>{getDoctorName(token.assignedDoctorId)}</TableCell>
+                    <TableCell className="font-semibold">{getDoctorQueuePosition(token)}</TableCell>
                     <TableCell className="text-right space-x-2">
                       {token.status === 'calling' && (
                         <>
