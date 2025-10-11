@@ -25,11 +25,71 @@ const initialDoctors: Doctor[] = [
   { id: 'dental2', name: 'Dr. Lisa Anderson', cabinNumber: '202', serviceType: 'DENTAL', status: 'active' },
 ];
 
+const STORAGE_KEY = 'clinic_state';
+
 export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [doctors, setDoctors] = useState<Doctor[]>(initialDoctors);
-  const [tokens, setTokens] = useState<Token[]>([]);
-  const [haltedTokens, setHaltedTokens] = useState<Token[]>([]);
-  const [tokenCounters, setTokenCounters] = useState({ GP: 0, DENTAL: 0 });
+  // Load initial state from localStorage
+  const loadState = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          doctors: parsed.doctors.map((d: any) => ({
+            ...d,
+            breakEndTime: d.breakEndTime ? new Date(d.breakEndTime) : undefined
+          })),
+          tokens: parsed.tokens.map((t: any) => ({
+            ...t,
+            createdAt: new Date(t.createdAt),
+            calledAt: t.calledAt ? new Date(t.calledAt) : undefined,
+            visitedAt: t.visitedAt ? new Date(t.visitedAt) : undefined
+          })),
+          haltedTokens: parsed.haltedTokens.map((t: any) => ({
+            ...t,
+            createdAt: new Date(t.createdAt),
+            calledAt: t.calledAt ? new Date(t.calledAt) : undefined,
+            visitedAt: t.visitedAt ? new Date(t.visitedAt) : undefined
+          })),
+          tokenCounters: parsed.tokenCounters
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load state:', e);
+    }
+    return null;
+  };
+
+  const savedState = loadState();
+  const [doctors, setDoctors] = useState<Doctor[]>(savedState?.doctors || initialDoctors);
+  const [tokens, setTokens] = useState<Token[]>(savedState?.tokens || []);
+  const [haltedTokens, setHaltedTokens] = useState<Token[]>(savedState?.haltedTokens || []);
+  const [tokenCounters, setTokenCounters] = useState(savedState?.tokenCounters || { GP: 0, DENTAL: 0 });
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    const state = { doctors, tokens, haltedTokens, tokenCounters };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    
+    // Notify other tabs about the change
+    window.dispatchEvent(new Event('storage'));
+  }, [doctors, tokens, haltedTokens, tokenCounters]);
+
+  // Listen for changes from other tabs
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const state = loadState();
+      if (state) {
+        setDoctors(state.doctors);
+        setTokens(state.tokens);
+        setHaltedTokens(state.haltedTokens);
+        setTokenCounters(state.tokenCounters);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   const calculateQueueStats = useCallback((): QueueStats => {
     const waitingTokens = tokens.filter(t => t.status === 'waiting');
