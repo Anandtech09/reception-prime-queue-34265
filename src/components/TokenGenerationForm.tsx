@@ -6,14 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ServiceType } from '@/types/clinic';
 import { useClinic } from '@/contexts/ClinicContext';
+import { TokenSlip } from '@/components/TokenSlip';
 import { Plus } from 'lucide-react';
 
 export const TokenGenerationForm = () => {
-  const { doctors, generateToken } = useClinic();
+  const { doctors, generateToken, tokens } = useClinic();
   const [patientName, setPatientName] = useState('');
   const [patientId, setPatientId] = useState('');
   const [serviceType, setServiceType] = useState<ServiceType>('GP');
   const [specificDoctor, setSpecificDoctor] = useState<string>('none');
+  const [slipOpen, setSlipOpen] = useState(false);
+  const [lastToken, setLastToken] = useState<any>(null);
 
   const availableDoctors = doctors.filter(d => d.serviceType === serviceType && d.status === 'active');
 
@@ -21,12 +24,22 @@ export const TokenGenerationForm = () => {
     e.preventDefault();
     if (!patientName || !patientId) return;
 
-    generateToken(
-      patientName, 
-      patientId, 
-      serviceType, 
-      specificDoctor && specificDoctor !== 'none' ? specificDoctor : undefined
-    );
+    const doctorId = specificDoctor && specificDoctor !== 'none' ? specificDoctor : undefined;
+    generateToken(patientName, patientId, serviceType, doctorId);
+    
+    // Get the just-created token (will be the last one in the array)
+    setTimeout(() => {
+      const newToken = tokens[tokens.length - 1];
+      if (newToken) {
+        const doctor = doctorId ? doctors.find(d => d.id === doctorId) : undefined;
+        setLastToken({
+          ...newToken,
+          doctorName: doctor?.name,
+          cabinNumber: doctor?.cabinNumber,
+        });
+        setSlipOpen(true);
+      }
+    }, 100);
     
     // Reset form
     setPatientName('');
@@ -102,6 +115,20 @@ export const TokenGenerationForm = () => {
           </Button>
         </form>
       </CardContent>
+
+      {lastToken && (
+        <TokenSlip
+          open={slipOpen}
+          onClose={() => setSlipOpen(false)}
+          tokenNumber={lastToken.tokenNumber}
+          patientName={lastToken.patientName}
+          patientId={lastToken.patientId}
+          serviceType={lastToken.serviceType}
+          doctorName={lastToken.doctorName}
+          cabinNumber={lastToken.cabinNumber}
+          createdAt={lastToken.createdAt}
+        />
+      )}
     </Card>
   );
 };

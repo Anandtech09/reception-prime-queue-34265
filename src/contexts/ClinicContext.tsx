@@ -55,12 +55,17 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       patientId,
       serviceType,
       status: 'waiting',
-      assignedDoctorId: specificDoctorId,
-      isSpecificDoctor: !!specificDoctorId,
+      assignedDoctorId: specificDoctorId, // Only set if specific doctor selected
+      isSpecificDoctor: !!specificDoctorId, // True only if specific doctor
       createdAt: new Date(),
     };
 
-    setTokens(prev => [...prev, newToken]);
+    setTokens(prev => {
+      const updated = [...prev, newToken];
+      console.log('Token generated:', newToken, 'Total tokens:', updated.length);
+      return updated;
+    });
+    
     toast({
       title: "Token Generated",
       description: `${tokenNumber} issued for ${patientName}`,
@@ -113,22 +118,29 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const doctor = doctors.find(d => d.id === doctorId);
     if (!doctor || doctor.status !== 'active') return;
 
-    // First check dedicated queue
+    // Priority 1: Check dedicated queue (specific doctor requests)
     const dedicatedToken = tokens.find(t => 
       t.assignedDoctorId === doctorId && 
       t.status === 'waiting' &&
-      t.isSpecificDoctor
+      t.isSpecificDoctor === true
     );
 
-    // Then check central queue
+    // Priority 2: Check central queue (no specific doctor)
     const centralToken = tokens.find(t => 
       t.serviceType === doctor.serviceType && 
       t.status === 'waiting' &&
-      !t.isSpecificDoctor &&
+      t.isSpecificDoctor === false &&
       !t.assignedDoctorId
     );
 
     const nextToken = dedicatedToken || centralToken;
+    
+    console.log('Calling next patient for', doctor.name, {
+      dedicatedToken,
+      centralToken,
+      nextToken,
+      allWaitingTokens: tokens.filter(t => t.status === 'waiting')
+    });
 
     if (!nextToken) {
       toast({
