@@ -26,18 +26,28 @@ export const QueueTable = () => {
     return <Badge variant="secondary">Waiting</Badge>;
   };
 
-  const getDoctorQueuePosition = (token: Token) => {
-    if (!token.assignedDoctorId) return '-';
-    
-    const doctorTokens = tokens
+  const getQueuePosition = (token: Token) => {
+    // Show position in shared service type queue
+    const serviceTokens = tokens
       .filter(t => 
-        t.assignedDoctorId === token.assignedDoctorId && 
-        t.status === 'waiting'
+        t.serviceType === token.serviceType &&
+        t.status === 'waiting' &&
+        !t.assignedDoctorId // Only count unassigned tokens in shared queue
       )
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
     
-    const position = doctorTokens.findIndex(t => t.id === token.id);
-    return position >= 0 ? `#${position + 1}` : '-';
+    const position = serviceTokens.findIndex(t => t.id === token.id);
+    
+    if (position >= 0) {
+      return `#${position + 1} in ${token.serviceType} queue`;
+    }
+    
+    // If assigned (calling or specific request), show status
+    if (token.assignedDoctorId) {
+      return token.isSpecificDoctor ? 'Specific Request' : 'Assigned';
+    }
+    
+    return '-';
   };
 
   return (
@@ -80,7 +90,7 @@ export const QueueTable = () => {
                     <TableCell>{token.serviceType}</TableCell>
                     <TableCell>{getStatusBadge(token)}</TableCell>
                     <TableCell>{getDoctorName(token.assignedDoctorId)}</TableCell>
-                    <TableCell className="font-semibold">{getDoctorQueuePosition(token)}</TableCell>
+                    <TableCell className="font-semibold text-sm">{getQueuePosition(token)}</TableCell>
                     <TableCell className="text-right space-x-2">
                       {token.status === 'calling' && (
                         <>

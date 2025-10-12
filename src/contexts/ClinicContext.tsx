@@ -163,33 +163,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const tokenNumber = `${serviceType}-${String(newCounter).padStart(3, '0')}`;
     
-    // Find the least busy active doctor to assign
-    const activeDoctorsOfType = doctors.filter(d => 
-      d.serviceType === serviceType && 
-      d.status === 'active'
-    );
-
-    let assignedDoctorId = specificDoctorId;
-    
-    // If no specific doctor selected, auto-assign to least busy active doctor
-    if (!specificDoctorId && activeDoctorsOfType.length > 0) {
-      // Count waiting tokens for each doctor
-      const doctorQueueCounts = activeDoctorsOfType.map(doctor => ({
-        doctorId: doctor.id,
-        queueCount: tokens.filter(t => 
-          t.assignedDoctorId === doctor.id && 
-          t.status === 'waiting'
-        ).length
-      }));
-      
-      // Find doctor with smallest queue
-      const leastBusyDoctor = doctorQueueCounts.reduce((min, curr) => 
-        curr.queueCount < min.queueCount ? curr : min
-      );
-      
-      assignedDoctorId = leastBusyDoctor.doctorId;
-    }
-    
+    // Add to shared queue (no doctor assignment unless specific doctor requested)
     const newToken: Token = {
       id: `token-${Date.now()}`,
       tokenNumber,
@@ -197,14 +171,14 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       patientId,
       serviceType,
       status: 'waiting',
-      assignedDoctorId,
+      assignedDoctorId: specificDoctorId, // Only assign if specific doctor requested
       isSpecificDoctor: !!specificDoctorId,
       createdAt: new Date(),
     };
 
     setTokens(prev => {
       const updated = [...prev, newToken];
-      console.log('Token generated and assigned:', newToken);
+      console.log('Token added to shared queue:', newToken);
       return updated;
     });
     
@@ -212,9 +186,9 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     
     toast({
       title: "Token Generated",
-      description: `${tokenNumber} issued for ${patientName}`,
+      description: `${tokenNumber} added to ${serviceType} queue`,
     });
-  }, [tokenCounters, doctors, tokens]);
+  }, [tokenCounters]);
 
   const updateDoctorStatus = useCallback((doctorId: string, status: DoctorStatus, breakDuration?: number) => {
     setDoctors(prev => prev.map(doc => {
@@ -222,49 +196,22 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
       const breakEndTime = breakDuration ? new Date(Date.now() + breakDuration * 60000) : undefined;
 
-      // Intelligently redistribute ALL waiting tokens if doctor going on break/disabled
+      // Return specific doctor requests back to shared queue if doctor going on break/disabled
       if (status !== 'active' && doc.status === 'active') {
-        const doctorWaitingTokens = tokens.filter(t => 
+        const doctorSpecificTokens = tokens.filter(t => 
           t.assignedDoctorId === doctorId && 
+          t.isSpecificDoctor &&
           t.status === 'waiting'
         );
 
-        if (doctorWaitingTokens.length > 0) {
-          const activeDoctors = prev.filter(d => 
-            d.id !== doctorId && 
-            d.serviceType === doc.serviceType && 
-            d.status === 'active'
-          );
-
-          if (activeDoctors.length > 0) {
-            // Count current queue sizes for each active doctor
-            const doctorQueueCounts = activeDoctors.map(doctor => ({
-              doctorId: doctor.id,
-              queueCount: tokens.filter(t => 
-                t.assignedDoctorId === doctor.id && 
-                t.status === 'waiting'
-              ).length
-            }));
-
-            setTokens(prevTokens => prevTokens.map(token => {
-              if (doctorWaitingTokens.some(dt => dt.id === token.id)) {
-                // Assign to least busy doctor
-                const leastBusyDoctor = doctorQueueCounts.reduce((min, curr) => 
-                  curr.queueCount < min.queueCount ? curr : min
-                );
-                
-                // Update the count for next assignment
-                const doctorIndex = doctorQueueCounts.findIndex(d => d.doctorId === leastBusyDoctor.doctorId);
-                if (doctorIndex !== -1) {
-                  doctorQueueCounts[doctorIndex].queueCount++;
-                }
-                
-                console.log(`Redistributing ${token.tokenNumber} to least busy doctor`);
-                return { ...token, assignedDoctorId: leastBusyDoctor.doctorId, isSpecificDoctor: false };
-              }
-              return token;
-            }));
-          }
+        if (doctorSpecificTokens.length > 0) {
+          setTokens(prevTokens => prevTokens.map(token => {
+            if (doctorSpecificTokens.some(dt => dt.id === token.id)) {
+              console.log(`Returning ${token.tokenNumber} to shared queue`);
+              return { ...token, assignedDoctorId: undefined, isSpecificDoctor: false };
+            }
+            return token;
+          }));
         }
       }
 
@@ -281,18 +228,30 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const doctor = doctors.find(d => d.id === doctorId);
     if (!doctor || doctor.status !== 'active') return;
 
-    // Find next waiting patient in this doctor's queue (oldest first)
-    const nextToken = tokens
+    // Find next waiting patient from shared service type queue (oldest first)
+    // Priority: 1. Specific requests for this doctor, 2. Unassigned patients from shared queue
+    const specificRequest = tokens
       .filter(t => 
         t.assignedDoctorId === doctorId && 
+        t.isSpecificDoctor &&
         t.status === 'waiting'
       )
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
 
+    const nextFromSharedQueue = tokens
+      .filter(t => 
+        t.serviceType === doctor.serviceType &&
+        !t.assignedDoctorId && // Not assigned to any doctor
+        t.status === 'waiting'
+      )
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+
+    const nextToken = specificRequest || nextFromSharedQueue;
+
     if (!nextToken) {
       toast({
         title: "No Patients",
-        description: "No patients in this doctor's queue",
+        description: `No patients in ${doctor.serviceType} queue`,
         variant: "destructive",
       });
       return;
@@ -300,7 +259,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setTokens(prev => prev.map(t => 
       t.id === nextToken.id 
-        ? { ...t, status: 'calling' as const, calledAt: new Date() }
+        ? { ...t, status: 'calling' as const, calledAt: new Date(), assignedDoctorId: doctorId }
         : t
     ));
 
@@ -362,35 +321,12 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const token = haltedTokens.find(t => t.id === tokenId);
     if (!token) return;
 
-    // Auto-assign to least busy doctor if not specified
-    let assignedDoctorId = doctorId;
-    if (!doctorId) {
-      const activeDoctorsOfType = doctors.filter(d => 
-        d.serviceType === token.serviceType && 
-        d.status === 'active'
-      );
-
-      if (activeDoctorsOfType.length > 0) {
-        const doctorQueueCounts = activeDoctorsOfType.map(doctor => ({
-          doctorId: doctor.id,
-          queueCount: tokens.filter(t => 
-            t.assignedDoctorId === doctor.id && 
-            t.status === 'waiting'
-          ).length
-        }));
-        
-        const leastBusyDoctor = doctorQueueCounts.reduce((min, curr) => 
-          curr.queueCount < min.queueCount ? curr : min
-        );
-        
-        assignedDoctorId = leastBusyDoctor.doctorId;
-      }
-    }
-
+    // Add to shared queue or assign to specific doctor if requested
     const requeuedToken = { 
       ...token, 
       status: 'waiting' as const, 
-      assignedDoctorId,
+      assignedDoctorId: doctorId, // Only assign if specific doctor selected
+      isSpecificDoctor: !!doctorId,
       createdAt: position === 'front' ? new Date(Date.now() - 1000000000) : new Date() // Set old timestamp for front position
     };
 
@@ -403,11 +339,12 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     });
 
+    const queueType = doctorId ? `doctor's queue` : `${token.serviceType} shared queue`;
     toast({
       title: "Patient Re-queued",
-      description: `${token.tokenNumber} added to ${position} of queue`,
+      description: `${token.tokenNumber} added to ${position} of ${queueType}`,
     });
-  }, [haltedTokens, doctors, tokens]);
+  }, [haltedTokens]);
 
   // Auto-restore doctors from break
   useEffect(() => {

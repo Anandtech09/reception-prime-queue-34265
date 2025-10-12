@@ -52,9 +52,9 @@ export default function Display() {
     return remaining > 0 ? `Back in ${remaining} min` : null;
   };
 
-  const getDoctorQueueCount = (doctorId: string) => {
+  const getServiceQueueCount = (serviceType: string) => {
     return tokens.filter(t => 
-      t.assignedDoctorId === doctorId && 
+      t.serviceType === serviceType && 
       t.status === 'waiting'
     ).length;
   };
@@ -70,13 +70,13 @@ export default function Display() {
               <th className="px-6 py-4 text-left text-xl font-bold">Cabin</th>
               <th className="px-6 py-4 text-left text-xl font-bold">Status</th>
               <th className="px-6 py-4 text-center text-xl font-bold">Now Calling</th>
-              <th className="px-6 py-4 text-center text-xl font-bold">In Queue</th>
+              <th className="px-6 py-4 text-center text-xl font-bold">Queue ({title.includes('GP') ? 'GP' : 'DENTAL'})</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {doctors.map((doctor) => {
               const currentToken = getCurrentToken(doctor);
-              const queueCount = getDoctorQueueCount(doctor.id);
+              const queueCount = getServiceQueueCount(doctor.serviceType);
               const breakTime = getBreakTimeRemaining(doctor);
 
               return (
