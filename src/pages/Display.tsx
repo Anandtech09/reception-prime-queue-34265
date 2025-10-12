@@ -70,7 +70,7 @@ export default function Display() {
               <th className="px-6 py-4 text-left text-xl font-bold">Cabin</th>
               <th className="px-6 py-4 text-left text-xl font-bold">Status</th>
               <th className="px-6 py-4 text-center text-xl font-bold">Now Calling</th>
-              <th className="px-6 py-4 text-center text-xl font-bold">Queue ({title.includes('GP') ? 'GP' : 'DENTAL'})</th>
+              <th className="px-6 py-4 text-center text-xl font-bold">Queue</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
