@@ -13,7 +13,7 @@ interface ClinicContextType {
   callNextPatient: (doctorId: string) => void;
   markPatientVisited: (tokenId: string) => void;
   markPatientHalted: (tokenId: string) => void;
-  requeuePatient: (tokenId: string) => void;
+  requeuePatient: (tokenId: string, doctorId?: string, position?: 'front' | 'back') => void;
 }
 
 const ClinicContext = createContext<ClinicContextType | undefined>(undefined);
@@ -358,18 +358,56 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [tokens]);
 
-  const requeuePatient = useCallback((tokenId: string) => {
+  const requeuePatient = useCallback((tokenId: string, doctorId?: string, position: 'front' | 'back' = 'back') => {
     const token = haltedTokens.find(t => t.id === tokenId);
     if (!token) return;
 
+    // Auto-assign to least busy doctor if not specified
+    let assignedDoctorId = doctorId;
+    if (!doctorId) {
+      const activeDoctorsOfType = doctors.filter(d => 
+        d.serviceType === token.serviceType && 
+        d.status === 'active'
+      );
+
+      if (activeDoctorsOfType.length > 0) {
+        const doctorQueueCounts = activeDoctorsOfType.map(doctor => ({
+          doctorId: doctor.id,
+          queueCount: tokens.filter(t => 
+            t.assignedDoctorId === doctor.id && 
+            t.status === 'waiting'
+          ).length
+        }));
+        
+        const leastBusyDoctor = doctorQueueCounts.reduce((min, curr) => 
+          curr.queueCount < min.queueCount ? curr : min
+        );
+        
+        assignedDoctorId = leastBusyDoctor.doctorId;
+      }
+    }
+
+    const requeuedToken = { 
+      ...token, 
+      status: 'waiting' as const, 
+      assignedDoctorId,
+      createdAt: position === 'front' ? new Date(Date.now() - 1000000000) : new Date() // Set old timestamp for front position
+    };
+
     setHaltedTokens(prev => prev.filter(t => t.id !== tokenId));
-    setTokens(prev => [...prev, { ...token, status: 'waiting' as const, assignedDoctorId: undefined }]);
+    setTokens(prev => {
+      if (position === 'front') {
+        return [requeuedToken, ...prev];
+      } else {
+        return [...prev, requeuedToken];
+      }
+    });
 
     toast({
       title: "Patient Re-queued",
-      description: `${token.tokenNumber} added back to queue`,
+      description: `${token.tokenNumber} added to ${position} of queue`,
     });
-  }, [haltedTokens]);
+  }, [haltedTokens, doctors, tokens]);
 
   // Auto-restore doctors from break
   useEffect(() => {

@@ -1,11 +1,21 @@
+import { useState } from 'react';
 import { useClinic } from '@/contexts/ClinicContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RotateCcw, AlertCircle } from 'lucide-react';
+import { RequeueDialog } from './RequeueDialog';
+import { Token } from '@/types/clinic';
 
 export const HaltedQueue = () => {
-  const { haltedTokens, requeuePatient } = useClinic();
+  const { haltedTokens } = useClinic();
+  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const handleRequeueClick = (token: Token) => {
+    setSelectedToken(token);
+    setDialogOpen(true);
+  };
 
   return (
     <Card>
@@ -46,7 +56,7 @@ export const HaltedQueue = () => {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => requeuePatient(token.id)}
+                        onClick={() => handleRequeueClick(token)}
                       >
                         <RotateCcw className="h-4 w-4 mr-1" />
                         Re-queue
@@ -59,6 +69,12 @@ export const HaltedQueue = () => {
           </Table>
         </div>
       </CardContent>
+
+      <RequeueDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        token={selectedToken}
+      />
     </Card>
   );
 };
