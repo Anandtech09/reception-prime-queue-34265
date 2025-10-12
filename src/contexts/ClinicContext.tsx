@@ -26,6 +26,7 @@ const initialDoctors: Doctor[] = [
 ];
 
 const STORAGE_KEY = 'clinic_state';
+const CHANNEL_NAME = 'clinic_sync';
 
 export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Load initial state from localStorage
@@ -66,30 +67,82 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [haltedTokens, setHaltedTokens] = useState<Token[]>(savedState?.haltedTokens || []);
   const [tokenCounters, setTokenCounters] = useState(savedState?.tokenCounters || { GP: 0, DENTAL: 0 });
 
-  // Save state to localStorage whenever it changes
+  // BroadcastChannel for cross-tab communication
+  const [broadcastChannel] = useState(() => {
+    try {
+      return new BroadcastChannel(CHANNEL_NAME);
+    } catch (e) {
+      console.log('BroadcastChannel not supported, using localStorage polling');
+      return null;
+    }
+  });
+
+  // Save state to localStorage and broadcast to other tabs
   useEffect(() => {
     const state = { doctors, tokens, haltedTokens, tokenCounters };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     
-    // Notify other tabs about the change
-    window.dispatchEvent(new Event('storage'));
-  }, [doctors, tokens, haltedTokens, tokenCounters]);
+    // Broadcast to other tabs using BroadcastChannel
+    if (broadcastChannel) {
+      broadcastChannel.postMessage({ type: 'STATE_UPDATE', state });
+    }
+  }, [doctors, tokens, haltedTokens, tokenCounters, broadcastChannel]);
 
-  // Listen for changes from other tabs
+  // Listen for updates from other tabs
   useEffect(() => {
-    const handleStorageChange = () => {
-      const state = loadState();
-      if (state) {
-        setDoctors(state.doctors);
-        setTokens(state.tokens);
-        setHaltedTokens(state.haltedTokens);
-        setTokenCounters(state.tokenCounters);
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'STATE_UPDATE') {
+        const state = event.data.state;
+        if (state) {
+          setDoctors(state.doctors.map((d: any) => ({
+            ...d,
+            breakEndTime: d.breakEndTime ? new Date(d.breakEndTime) : undefined
+          })));
+          setTokens(state.tokens.map((t: any) => ({
+            ...t,
+            createdAt: new Date(t.createdAt),
+            calledAt: t.calledAt ? new Date(t.calledAt) : undefined,
+            visitedAt: t.visitedAt ? new Date(t.visitedAt) : undefined
+          })));
+          setHaltedTokens(state.haltedTokens.map((t: any) => ({
+            ...t,
+            createdAt: new Date(t.createdAt),
+            calledAt: t.calledAt ? new Date(t.calledAt) : undefined,
+            visitedAt: t.visitedAt ? new Date(t.visitedAt) : undefined
+          })));
+          setTokenCounters(state.tokenCounters);
+        }
       }
     };
 
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+    if (broadcastChannel) {
+      broadcastChannel.addEventListener('message', handleMessage);
+      return () => {
+        broadcastChannel.removeEventListener('message', handleMessage);
+      };
+    } else {
+      // Fallback: Poll localStorage every 500ms
+      const interval = setInterval(() => {
+        const state = loadState();
+        if (state) {
+          setDoctors(state.doctors);
+          setTokens(state.tokens);
+          setHaltedTokens(state.haltedTokens);
+          setTokenCounters(state.tokenCounters);
+        }
+      }, 500);
+      return () => clearInterval(interval);
+    }
+  }, [broadcastChannel]);
+
+  // Cleanup BroadcastChannel on unmount
+  useEffect(() => {
+    return () => {
+      if (broadcastChannel) {
+        broadcastChannel.close();
+      }
+    };
+  }, [broadcastChannel]);
 
   const calculateQueueStats = useCallback((): QueueStats => {
     const waitingTokens = tokens.filter(t => t.status === 'waiting');
