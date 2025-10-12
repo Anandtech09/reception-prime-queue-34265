@@ -10,13 +10,12 @@ import { TokenSlip } from '@/components/TokenSlip';
 import { Plus } from 'lucide-react';
 
 export const TokenGenerationForm = () => {
-  const { doctors, generateToken, tokens } = useClinic();
+  const { doctors, generateToken, lastGeneratedToken } = useClinic();
   const [patientName, setPatientName] = useState('');
   const [patientId, setPatientId] = useState('');
   const [serviceType, setServiceType] = useState<ServiceType>('GP');
   const [specificDoctor, setSpecificDoctor] = useState<string>('none');
   const [slipOpen, setSlipOpen] = useState(false);
-  const [lastToken, setLastToken] = useState<any>(null);
 
   const availableDoctors = doctors.filter(d => d.serviceType === serviceType && d.status === 'active');
 
@@ -27,19 +26,7 @@ export const TokenGenerationForm = () => {
     const doctorId = specificDoctor && specificDoctor !== 'none' ? specificDoctor : undefined;
     generateToken(patientName, patientId, serviceType, doctorId);
     
-    // Get the just-created token (will be the last one in the array)
-    setTimeout(() => {
-      const newToken = tokens[tokens.length - 1];
-      if (newToken) {
-        const doctor = doctorId ? doctors.find(d => d.id === doctorId) : undefined;
-        setLastToken({
-          ...newToken,
-          doctorName: doctor?.name,
-          cabinNumber: doctor?.cabinNumber,
-        });
-        setSlipOpen(true);
-      }
-    }, 100);
+    setSlipOpen(true);
     
     // Reset form
     setPatientName('');
@@ -116,17 +103,17 @@ export const TokenGenerationForm = () => {
         </form>
       </CardContent>
 
-      {lastToken && (
+      {lastGeneratedToken && (
         <TokenSlip
           open={slipOpen}
           onClose={() => setSlipOpen(false)}
-          tokenNumber={lastToken.tokenNumber}
-          patientName={lastToken.patientName}
-          patientId={lastToken.patientId}
-          serviceType={lastToken.serviceType}
-          doctorName={lastToken.doctorName}
-          cabinNumber={lastToken.cabinNumber}
-          createdAt={lastToken.createdAt}
+          tokenNumber={lastGeneratedToken.tokenNumber}
+          patientName={lastGeneratedToken.patientName}
+          patientId={lastGeneratedToken.patientId}
+          serviceType={lastGeneratedToken.serviceType}
+          doctorName={lastGeneratedToken.assignedDoctorId ? doctors.find(d => d.id === lastGeneratedToken.assignedDoctorId)?.name : undefined}
+          cabinNumber={lastGeneratedToken.assignedDoctorId ? doctors.find(d => d.id === lastGeneratedToken.assignedDoctorId)?.cabinNumber : undefined}
+          createdAt={lastGeneratedToken.createdAt}
         />
       )}
     </Card>

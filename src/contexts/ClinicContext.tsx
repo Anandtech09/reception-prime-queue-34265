@@ -7,6 +7,7 @@ interface ClinicContextType {
   tokens: Token[];
   haltedTokens: Token[];
   queueStats: QueueStats;
+  lastGeneratedToken: Token | null;
   generateToken: (patientName: string, patientId: string, serviceType: ServiceType, specificDoctorId?: string) => void;
   updateDoctorStatus: (doctorId: string, status: DoctorStatus, breakDuration?: number) => void;
   callNextPatient: (doctorId: string) => void;
@@ -66,6 +67,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [tokens, setTokens] = useState<Token[]>(savedState?.tokens || []);
   const [haltedTokens, setHaltedTokens] = useState<Token[]>(savedState?.haltedTokens || []);
   const [tokenCounters, setTokenCounters] = useState(savedState?.tokenCounters || { GP: 0, DENTAL: 0 });
+  const [lastGeneratedToken, setLastGeneratedToken] = useState<Token | null>(null);
 
   // BroadcastChannel for cross-tab communication
   const [broadcastChannel] = useState(() => {
@@ -205,6 +207,8 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log('Token generated and assigned:', newToken);
       return updated;
     });
+    
+    setLastGeneratedToken(newToken);
     
     toast({
       title: "Token Generated",
@@ -392,6 +396,7 @@ export const ClinicProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         tokens,
         haltedTokens,
         queueStats,
+        lastGeneratedToken,
         generateToken,
         updateDoctorStatus,
         callNextPatient,
