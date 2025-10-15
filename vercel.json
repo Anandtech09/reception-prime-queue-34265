@@ -1,7 +1,13 @@
+{
+  "rewrites": [
     {
-      "git": {
-        "github": {
-          "enabled": false
-        }
-      }
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
+  ],
+  "git": {
+    "github": {
+      "enabled": false
+    }
+  }
+}
